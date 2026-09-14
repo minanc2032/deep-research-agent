@@ -17,5 +17,8 @@ research_report.graph.json
 *.graph.json
 .DS_Store
 
-# keep example env committed
+# keep example env + portfolio sample assets committed
 !.env.example
+!examples/sample_report.md
+!examples/*.graph.json
+!docs/assets/*.png

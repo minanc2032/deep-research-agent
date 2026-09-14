@@ -1,44 +1,64 @@
 # Deep Research Agent
 
-A read-only CLI research agent. It takes a topic, plans multi-hop questions, searches the public web, fetches and grades sources, builds a citation graph, flags contradictions, and writes a fully cited Markdown report.
+CLI research agent that plans multi-hop questions, grades public sources, builds a citation graph, flags contradictions, and writes a fully cited Markdown report — evidence in, not just chat out.
 
-This is an MVP: one agent loop, no UI, no database, no write actions against the web.
+![banner](docs/assets/banner.png)
 
-## What it does
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 
-1. **Plans** 3 hops of sub-questions and search queries with an OpenAI-compatible LLM.
-2. **Searches** DuckDuckGo (free) and **fetches** pages with `httpx` + `trafilatura`.
-3. **Grades** each source on credibility, relevance, and recency.
-4. **Extracts claims**, links them into a **citation graph** (support / contradict), and **detects contradictions** with pointers to both sides.
-5. **Writes** a Markdown report with footnotes, a sources appendix, a graph summary, and optional Mermaid. The graph is also exported as JSON.
+## Why this exists
 
-Defaults are human-safe: GET-only fetches, public `http(s)` URLs, timeouts, size caps, and no form submission or code execution from pages.
+Most “research agents” summarize whatever the model already knows. This one **resolves a topic against live sources**:
 
-## Requirements
+- Plans 3 hops of sub-questions and search queries
+- Searches DuckDuckGo, fetches pages (`httpx` + `trafilatura`)
+- Grades credibility / relevance / recency
+- Extracts claims → citation graph (assert / support / contradict)
+- Surfaces contradictions with pointers to both sides
+- Emits a footnote-cited Markdown report + graph JSON
 
-- Python 3.11+
-- An OpenAI-compatible API key for live runs
+Read-only by default: GET-only fetches, public `http(s)` only, timeouts, size caps, no form posts, no page JS execution.
 
-## Install
+## Demo
+
+![CLI demo](docs/assets/cli-demo.png)
+
+Sample output from a GLP-1 / cardiovascular outcomes run: **[examples/sample_report.md](examples/sample_report.md)**
+
+```text
+Report: research_report.md
+Graph:  research_report.graph.json
+Sources: 6  Claims: 8  Contradictions: 0
+```
+
+## Architecture
+
+```mermaid
+flowchart LR
+  A[Plan hops] --> B[Search + fetch]
+  B --> C[Grade sources]
+  C --> D[Extract claims]
+  D --> E[Citation graph]
+  E --> F[Detect contradictions]
+  F --> G[Cited Markdown report]
+```
+
+## Quickstart
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
+cp .env.example .env        # set OPENAI_API_KEY
 ```
 
-Copy `.env.example` to `.env` and set:
+`.env` keys (see `.env.example`):
 
-```bash
-OPENAI_API_KEY=sk-...
-# optional
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4o-mini
-```
-
-`OPENAI_BASE_URL` can point at Azure OpenAI, Groq, Ollama, OpenRouter, or any `/v1/chat/completions` server.
-
-## Run
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | yes (live runs) | Tests mock the LLM |
+| `OPENAI_BASE_URL` | no | Azure / Groq / Ollama / OpenRouter / any `/v1` |
+| `OPENAI_MODEL` | no | Default `gpt-4o-mini`; override with `--model` |
 
 ```bash
 python -m research_agent "GLP-1 drugs and cardiovascular outcomes" \
@@ -47,54 +67,56 @@ python -m research_agent "GLP-1 drugs and cardiovascular outcomes" \
   --model gpt-4o-mini
 ```
 
-Equivalent entry point after install:
-
-```bash
-research-agent "GLP-1 drugs and cardiovascular outcomes" --max-sources 6
-```
-
-Flags:
+Or after install: `research-agent "your topic" --max-sources 6`
 
 | Flag | Meaning |
 | --- | --- |
-| `--max-sources` | Cap on graded sources kept in the report |
+| `--max-sources` | Cap on graded sources kept |
 | `--output` | Markdown report path |
 | `--model` | Per-run model override |
-| `--graph-json` | Optional graph JSON path (defaults to `<output>.graph.json`) |
-| `--no-mermaid` | Skip the Mermaid block |
+| `--graph-json` | Graph JSON path (default: alongside `--output`) |
+| `--no-mermaid` | Skip Mermaid block in the report |
 | `-v` | Debug logs on stderr |
 
-The CLI prints the report path, graph path, and source/claim/contradiction counts. Progress logs go to stderr.
+## Sample output highlights
 
-## Report shape
+The report includes:
 
 - Executive summary and cited sections (`[^1]` footnotes)
-- Research plan (hops and queries)
-- Contradictions with side A / side B source pointers
-- Citation graph summary, plus Mermaid
-- Footnote list and a source appendix with grades and extracted claims
+- Research plan (hops + queries)
+- Contradictions with **Side A / Side B** source pointers
+- Citation graph summary + optional Mermaid
+- Footnotes and a source appendix with grades and extracted claims
 
-## Tests
+See [examples/sample_report.md](examples/sample_report.md) for a full example on GLP-1 drugs and cardiovascular outcomes.
 
-Unit tests mock the LLM, search, and fetch layers. No network or API key is required.
+## Safety defaults
+
+- **GET-only** HTTP(S); no credentials in URLs
+- Blocks localhost / private / link-local / metadata IPs
+- Fetch timeout + max body size
+- No login, paywall clicking, or executing page JavaScript
+- Agent writes only the local report / graph files you ask for
+
+## Project layout
+
+```text
+research_agent/          planner, search, fetch, grading, graph, report, CLI
+tests/                   mocked unit tests (no network / API key)
+examples/sample_report.md
+docs/assets/             banner + CLI demo
+pyproject.toml
+.env.example
+```
 
 ```bash
 pip install -e ".[dev]"
 pytest
 ```
 
-## Layout
-
-```
-research_agent/     package (planner, tools, graph, report, CLI)
-tests/              mocked unit tests
-pyproject.toml
-.env.example
-```
-
 ## Limits
 
-- Search quality depends on DuckDuckGo HTML results.
+- Search quality tracks DuckDuckGo HTML results.
 - Grading is heuristic (domain + lexical overlap + date), not a trust oracle.
-- The agent does not log in, click paywalls, or execute page JavaScript.
 - Live quality tracks whatever model you point `OPENAI_BASE_URL` at.
+- Paywalled or JS-only pages will not be fully extracted.
