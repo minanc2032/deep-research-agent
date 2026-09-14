@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-agent"
+version = "0.1.0"
+description = "Deep research CLI agent with citation graphs and contradiction detection."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Deep Research Agent" }]
+keywords = ["research", "agent", "citations", "cli"]
+dependencies = [
+    "ddgs>=9.0.0",
+    "httpx>=0.27.0",
+    "python-dotenv>=1.0.1",
+    "trafilatura>=1.12.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
+[project.scripts]
+research-agent = "research_agent.cli:main"
+
+[project.urls]
+Homepage = "https://origin.cursor.com/mine-projects/deep-research-agent"
+
+[tool.setuptools.packages.find]
+include = ["research_agent*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]
